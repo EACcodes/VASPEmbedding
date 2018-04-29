@@ -19,32 +19,32 @@ cp -r $VASPEMB_PATH/examples/cl2_test/* ./
 
 cp $VASPEMB_PATH/drivers/* ./
 
-# open svasp.emb, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
-# open optimize.py, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
+open svasp.emb, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
+open optimize.py, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
 
-# do reference calculation
+do reference calculation
 cd ref
 ../svasp.emb -np 16 -walltime 1:00:00 -mem 60000mb ref
 # this will submit the reference calculation to the SLURM system, wait until it's finished
 
-# Split the DERINFO and POSCAR use split_DERINFO.py
-# NOTE: for other systems, make sure you configured the cluster definition in split_DERINFO.py.
-# NOTE: The cluster definition is configured by the following variables in split_DERINFO.py
-# n_atom: total number of atoms, including cluster and environtment.
-# cluster: the atom number list for cluster. ALERT: atom number start from 1, yes, even it's in python!
-# na_cluster: a dictionary defining the number of atoms by elements within cluster, used to make POSCAR for cluster
-#             key   - element labels;
-#             value - numbers of this particular type of element
+Split the DERINFO and POSCAR use split_DERINFO.py
+NOTE: for other systems, make sure you configured the cluster definition in split_DERINFO.py.
+NOTE: The cluster definition is configured by the following variables in split_DERINFO.py
+n_atom: total number of atoms, including cluster and environtment.
+cluster: the atom number list for cluster. ALERT: atom number start from 1, yes, even it's in python!
+na_cluster: a dictionary defining the number of atoms by elements within cluster, used to make POSCAR for cluster
+            key   - element labels;
+            value - numbers of this particular type of element
 
 cd /run/path
 ./split_DERINFO.py # This should generate POSCAR.cluster, POSCAR.environ, DERINFO.cluster, and DERINFO.environ
 
-# Run the actual optimization
-# ALERT: must use same number of processors (in here, 16) as the reference calculation !!!
-# ALERT: must turn off symmetry (set ISYM=0 in INCAR) in the actual optimization !!!
+Run the actual optimization
+ALERT: must use same number of processors (in here, 16) as the reference calculation !!!
+ALERT: must turn off symmetry (set ISYM=0 in INCAR) in the actual optimization !!!
 ./soptimize.sh -np 16 -walltime 1:00:00 cl2_test
 
-# Hope your embedding calculation works :-)
+Hope your embedding calculation works :-)
 
 
 #################
