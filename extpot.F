@@ -38,6 +38,7 @@
     ! read INCAR FILE for external potential information
     subroutine EXTPT_READER(NGXF,NGYF,NGZF,IU0,IU5,IU6)
       use base
+      use reader_tags
       use vaspxml
       implicit none
 
@@ -58,38 +59,10 @@
       EXTPT%nx = -1
       EXTPT%ny = -1
       EXTPT%nz = -1
-      CALL RDATAB(lopen,INCAR,IU5,'LEXTPOT','=','#',';','L', &   ! calling rdatab subroutine for reading INCAR and searching for LEXTPOT
-     &            IDUM,RDUM,CDUM,EXTPT%lextpot,CHARAC,N,1,IERR)
-      IF (((IERR/=0).AND.(IERR/=3)).OR. &
-     &                    ((IERR==0).AND.(N<1))) THEN
-         IF (IU0>=0) &
-         WRITE(IU0,*)'Error reading item ''LEXTPOT'' from file INCAR.'
-         EXTPT%lextpot = .FALSE.
-         RETURN
-      ENDIF
-       CALL RDATAB(lopen,INCAR,IU5,'DEXTPOT','=','#',';','L', &   ! calling rdatab subroutine for reading INCAR and searching for DEXTPOT
-     &            IDUM,RDUM,CDUM,EXTPT%dextpot,CHARAC,N,1,IERR)
-      IF (((IERR/=0).AND.(IERR/=3)).OR. &
-     &                    ((IERR==0).AND.(N<1))) THEN
-         IF (IU0>=0) &
-         WRITE(IU0,*)'Error reading item ''DEXTPOT'' from file INCAR.'
-         EXTPT%dextpot = .FALSE.
-         RETURN
-      ENDIF
-     CALL XML_INCAR('LEXTPOT','L',IDUM,RDUM,CDUM,EXTPT%lextpot,CHARAC,N)
-     CALL XML_INCAR('DEXTPOT','L',IDUM,RDUM,CDUM,EXTPT%dextpot,CHARAC,N)
-
+      CALL PROCESS_INCAR(INCAR_F, 'LEXTPOT', EXTPT%lextpot)
+      CALL PROCESS_INCAR(INCAR_F, 'DEXTPOT', EXTPT%dextpot)
       if( EXTPT%lextpot ) then
-         CALL RDATAB(lopen,INCAR,IU5,'FCORR','=','#',';','F', &
-                     IDUM,EXTPT%FCORR,CDUM,LDUM,CHARAC,N,1,IERR)
-         IF (((IERR/=0).AND.(IERR/=3)).OR. &
-        &                    ((IERR==0).AND.(N<1))) THEN
-            IF (IU0>=0) &
-            WRITE(IU0,*)'Error reading item ''FCORR'' from file INCAR.'
-            EXTPT%FCORR = 0.67_q
-            RETURN
-         ENDIF
-         CALL XML_INCAR('FCORR','F',IDUM,EXTPT%FCORR,CDUM,LDUM,CHARAC,N)
+         CALL PROCESS_INCAR(INCAR_F, 'FCORR', EXTPT%FCORR)
       endif
 
       if( EXTPT%lextpot ) then
