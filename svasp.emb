@@ -8,7 +8,8 @@ NPROC=1
 NODES=0
 PPN=0
 SERIAL=0
-VASP_EXEC=/INSTALLATION/PATH/vasp
+VASP_ROOT=/share/home/kuangy/compile/vasp6.2.1-fullpack/vasp.6.2.1
+VASP_EXEC=$VASP_ROOT/bin/vasp_std
 MEM=10000
 
 
@@ -69,15 +70,12 @@ cat >> $TARGET << EOF
 #SBATCH --tasks-per-node=$PPN
 #SBATCH --mem=$MEM
 
-module purge
-module load openmpi/intel-13.0/1.6.3/64
-module load intel/13.0/64/13.0.1.117
-module load intel-mkl/11.1/0/64
-export VASP_VERSION=5.3.3
+source $VASP_ROOT/env.sh
+export VASP_VERSION=6.2.1
 
 cd  \$SLURM_SUBMIT_DIR
 export VIADEV_USE_AFFINITY=0
-srun -n $NPROC $VASP_EXEC > logfile
+mpirun -np $NPROC $VASP_EXEC > logfile
 
 sleep 3
  

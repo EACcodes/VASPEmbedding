@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/env python2.7
 import sys
 import os
 import commands
@@ -29,14 +29,12 @@ ofile = file( WD+'/runvasp.sh', 'w' )
 # Generate vasp run script
 print >> ofile, """\
 #!bin/bash
-module purge
-module load openmpi/intel-13.0/1.6.3/64
-module load intel/13.0/64/13.0.1.117
-module load intel-mkl/11.1/0/64
-export VASP_VERSION=5.3.3
+VASPROOT=/share/home/kuangy/compile/vasp6.2.1-fullpack/vasp.6.2.1/
+source $VASPROOT/env.sh
+export VASP_VERSION=6.2.1
 
 export VIADEV_USE_AFFINITY=0
-VASP_EXEC=/INSTALLATION/PATH/vasp
+VASP_EXEC=$VASPROOT/bin/vasp_std
 if [ -d cluster ]; then cp cluster/CHGCAR ./CHGCAR.cluster; cp cluster/WAVECAR ./WAVECAR.cluster; rm -r cluster; fi
 if [ -d environ ]; then cp environ/CHGCAR ./CHGCAR.environ; cp environ/WAVECAR ./WAVECAR.environ;  rm -r environ; fi
 mkdir cluster
@@ -57,9 +55,9 @@ if environ == 'slurm':
     print >> ofile, """\
 # run VASP
 cd cluster
-srun -n $SLURM_NPROCS $VASP_EXEC > logfile
+mpirun -np $SLURM_NPROCS $VASP_EXEC > logfile
 cd ../environ
-srun -n $SLURM_NPROCS $VASP_EXEC > logfile
+mpirun -np $SLURM_NPROCS $VASP_EXEC > logfile
 cd ..
 """
 elif environ == 'pbs':
