@@ -1,0 +1,20 @@
+#! /bin/bash 
+#SBATCH --nodes=1 
+#SBATCH --ntasks-per-node=96 
+#SBATCH --mem-per-cpu=7500 
+#SBATCH -t 24:00:00 
+#SBATCH --job-name=sample_vasp_emb
+#SBATCH --output=JobName-%j.o 
+#SBATCH --error=JobName-%j.e
+ 
+cd $SLURM_SUBMIT_DIR
+ 
+export VASP_EXEC=/path/to/vasp_emb/executable
+module load anaconda3/2022.5
+module load intel-mkl/2020.1
+module load intel/19.1.1.217
+module load ucx/1.9.0
+module load intel-mpi/intel/2019.7
+module load hdf5/intel-19.1/intel-mpi/1.10.6
+
+./optimize_python3.py
