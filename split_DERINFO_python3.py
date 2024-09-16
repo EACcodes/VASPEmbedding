@@ -5,7 +5,7 @@ import os
 n_atom = 100
 cluster = [6,8,16,18,23,25,26,32,33,35,38,43,47,48,49]
 na_cluster = {'Pt':15}
-#pleaase remove the line "Selective dynamics" from the POSCAR of ref if present
+#please remove the line "Selective dynamics" from the POSCAR of ref if present
 
 environ = list(range(1,n_atom+1))
 for i in cluster:
