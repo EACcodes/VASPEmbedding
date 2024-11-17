@@ -217,7 +217,7 @@
       ! 1D interpolate for delta grid, used later as basis for 3D B-spline
       call CALC_Sdelta_COEFF(NXMAX, SCX, di_smear)
       call CALC_Sdelta_COEFF(NYMAX, SCY, di_smear)
-      call CALC_Sdelta_COEFF(NZMAX, sCZ, di_smear)
+      call CALC_Sdelta_COEFF(NZMAX, SCZ, di_smear)
       call BSPLINE_INTERPOLATE_COEFF( EXTPT_GRID, SGRID, NXMAX, NYMAX, NZMAX, di_smear, &
                                         SCX, SCY, SCZ, GRIDC )
 
