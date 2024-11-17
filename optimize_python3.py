@@ -1,14 +1,16 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3.9
 import sys
 import os
-import commands
+import subprocess
+import numpy
+from subprocess import check_output
 from math import *
 from numpy import reshape
 from numpy import fft
 from numpy import sum
 from numpy import meshgrid
-from scipy import dot
-from scipy import array
+from numpy import dot
+from numpy import array
 from scipy import average
 from scipy import optimize
 from scipy import random
@@ -18,61 +20,52 @@ istart = 0
 environ = 'slurm' # 'pbs'
 
 # read information from running environment
-if environ == 'pbs':
-    nproc = int( commands.getoutput("wc -l $PBS_NODEFILE | awk '{print $1}'") )
-    WD = commands.getoutput("echo $PBS_O_WORKDIR")
-elif environ == 'slurm':
-    nproc = int( commands.getoutput("echo $SLURM_NPROCS") )
-    WD = commands.getoutput("echo $SLURM_SUBMIT_DIR")
+if environ == 'slurm':
+    WD = subprocess.check_output(['pwd']).decode().rstrip("\n")
 
-ofile = file( WD+'/runvasp.sh', 'w' )
+filepath = WD + '/runvasp.sh'
+ofile = open(filepath, 'w')
 # Generate vasp run script
-print >> ofile, """\
+print("""\
 #!bin/bash
-VASPROOT=/share/home/kuangy/compile/vasp6.2.1-fullpack/vasp.6.2.1/
-source $VASPROOT/env.sh
-export VASP_VERSION=6.2.1
 
-export VIADEV_USE_AFFINITY=0
-VASP_EXEC=$VASPROOT/bin/vasp_std
-if [ -d cluster ]; then cp cluster/CHGCAR ./CHGCAR.cluster; cp cluster/WAVECAR ./WAVECAR.cluster; rm -r cluster; fi
-if [ -d environ ]; then cp environ/CHGCAR ./CHGCAR.environ; cp environ/WAVECAR ./WAVECAR.environ;  rm -r environ; fi
+if [ -d cluster ]; then mv cluster/CHGCAR ./CHGCAR.cluster; mv cluster/WAVECAR ./WAVECAR.cluster; mv cluster/DERINFO ./DERINFO.cluster; rm -r cluster; fi
+if [ -d environ ]; then mv environ/CHGCAR ./CHGCAR.environ; mv environ/WAVECAR ./WAVECAR.environ; mv environ/DERINFO ./DERINFO.environ; rm -r environ; fi
+
 mkdir cluster
 mkdir environ
 cp POSCAR.cluster cluster/POSCAR
 cp POSCAR.environ environ/POSCAR
-cp -r DERINFO.cluster cluster/DERINFO
-cp -r DERINFO.environ environ/DERINFO
-cp CHGCAR.cluster cluster/CHGCAR
-cp CHGCAR.environ environ/CHGCAR
-cp WAVECAR.cluster cluster/WAVECAR
-cp WAVECAR.environ environ/WAVECAR
-cp INCAR KPOINTS EXTPOT POTCAR cluster
-cp INCAR KPOINTS EXTPOT POTCAR environ
-"""
+cp POTCAR.cluster cluster/POTCAR
+cp POTCAR.environ environ/POTCAR
+mv DERINFO.cluster cluster/DERINFO
+mv DERINFO.environ environ/DERINFO
+mv CHGCAR.cluster cluster/CHGCAR
+mv WAVECAR.cluster cluster/WAVECAR
+mv WAVECAR.environ environ/WAVECAR
+mv CHGCAR.environ environ/CHGCAR
+cp INCAR.cluster cluster/INCAR 
+cp KPOINTS.cluster cluster/KPOINTS
+ln -s ../EXTPOT cluster/EXTPOT
+cp INCAR.environ environ/INCAR
+cp KPOINTS.environ environ/KPOINTS
+ln -s ../EXTPOT environ/EXTPOT
+""", file=ofile)
 
 if environ == 'slurm':
-    print >> ofile, """\
+    print("""\
 # run VASP
 cd cluster
-mpirun -np $SLURM_NPROCS $VASP_EXEC > logfile
+srun -n $SLURM_NPROCS $VASP_EXEC > logfile  
 cd ../environ
-mpirun -np $SLURM_NPROCS $VASP_EXEC > logfile
+srun -n $SLURM_NPROCS $VASP_EXEC > logfile  
 cd ..
-"""
-elif environ == 'pbs':
-    print >> ofile, """\
-cd cluster
-srun -np `wc -l $PBS_NODEFILE | awk '{print $1}'` --mca btl ^tcp --bind-to-socket $VASP_EXEC > logfile
-cd ../environ
-mpiexec -np `wc -l $PBS_NODEFILE | awk '{print $1}'` --mca btl ^tcp --bind-to-socket $VASP_EXEC > logfile
-cd ..
-"""
+""",file=ofile)
 
 ofile.close()
 
 # Read grid dimensions
-ifile = file( 'INCAR', 'r' )
+ifile = open( 'INCAR.cluster', 'r' )
 NGXF = -1
 NGYF = -1
 NGZF = -1
@@ -107,7 +100,7 @@ if ISYM != 0:
 ntot = NGXF*NGYF*NGZF
 # read reference density
 def read_CHGCAR( ifn ):
-    ifile = file( ifn, 'r' )
+    ifile = open( ifn, 'r' )
     density = []
     iread = 0
     for line in ifile:
@@ -128,7 +121,7 @@ def read_CHGCAR( ifn ):
             for word in words:
                 density.append(float(word))
     ifile.close()
-    density = array(density)
+    density = numpy.array(density)
     return density
 rou_ref = read_CHGCAR( 'ref/DERIV' )
 
@@ -136,15 +129,15 @@ def print_grid( extpot, ofn ):
     itot = 0
     iprint = 0
     os.system( 'if [ -f %s ]; then rm %s; fi'%(ofn, ofn) )
-    ofile = file( ofn, 'w' )
-    print >>ofile, '%d %d %d'%(NGXF, NGYF, NGZF)
+    ofile = open( ofn, 'w' )
+    print('%d %d %d'%(NGXF, NGYF, NGZF),file=ofile)
     for iz in range(NGZF):
         for iy in range(NGYF):
            for ix in range(NGXF):
-                print >>ofile, '%15.8e'%extpot[itot],
+                print('%15.8e'%extpot[itot],end=' ',file=ofile)
                 iprint += 1
                 if iprint%8 == 0:
-                    print >>ofile
+                    print('',file=ofile)
                 itot += 1
     ofile.close()
 
@@ -157,7 +150,29 @@ def laplacian3d(field, nx, ny, nz):
         fft.ifft(-KY**2*fft.fft(field, axis = 1), axis = 1).real + \
         fft.ifft(-KZ**2*fft.fft(field, axis = 2), axis = 2).real
 
+def read_POSCAR( ifn ):
+    ifile = open( ifn, 'r' )
+    ifile.readline()
+    line = ifile.readline()
+    sfac = float( line )
+    box = []
+    for idim in range(3):
+        line = ifile.readline()
+        words = line.split()
+        l = [ float(words[i]) for i in range(3) ]
+        box.append(l)
+    box = numpy.array(box)*sfac
+    ifile.close()    
+    return box
+
+box = read_POSCAR( 'POSCAR.cluster' )
+vtot=box[0,0]*box[1,1]*box[2,2]*(1/(0.52917721067**3))
+   
+print('Cell volume (bohr^3): %16.10e'%vtot)
+print('Step      -W_p[eV]         |sum(drho_p)|[e]   rmsd_p(c)[a.u.]      -W[eV]           |sum(drho)|[e]    rmsd(c)[a.u.]       method    loopn')
+
 eval_counter = 0
+
 def Lagrangian( params, *args ):
     global eval_counter
     extpot = params
@@ -166,40 +181,28 @@ def Lagrangian( params, *args ):
     # run vasp
     os.system( 'bash runvasp.sh' )    
     # read E_cluster (eV)
-    line = commands.getoutput( 'grep E0 cluster/logfile' )
+    line = subprocess.check_output(['grep E0 cluster/logfile'],shell = True).decode().rstrip("\n")
     tmp = line.split('E0=')[1]
     E_cluster = float(tmp.split()[0])
     # read E_environ (eV)
-    line = commands.getoutput( 'grep E0 environ/logfile' )
+    line = subprocess.check_output(['grep E0 environ/logfile'],shell = True).decode().rstrip("\n")
     tmp = line.split('E0=')[1]
     E_environ = float(tmp.split()[0])
-    # check for unfinished VASP jobs
-    ierr = int(commands.getoutput( 'grep "General timing and accounting informations" cluster/OUTCAR | wc' ).split()[0])
-    if ierr == 0:
-        sys.exit('ERROR: VASP jobs exit abnormally in cluster calculation!')
-    ierr = int(commands.getoutput( 'grep "General timing and accounting informations" environ/OUTCAR | wc' ).split()[0])
-    if ierr == 0:
-        sys.exit('ERROR: VASP jobs exit abnormally in environ calculation!')
-    ierr = int(commands.getoutput( 'grep "Internal error, mismatch with DERINFO" cluster/logfile | wc' ).split()[0])
-    if ierr > 0:
-        sys.exit('ERROR: DERINFO error in cluster calculation, please check for possible file corruption.')
-    ierr = int(commands.getoutput( 'grep "Internal error, mismatch with DERINFO" environ/logfile | wc' ).split()[0])
-    if ierr > 0:
-        sys.exit('ERROR: DERINFO error in environ calculation, please check for possible file corruption.')
     # compute \int V(r)*(na+nb-nref) (eV)
     rou_cluster = read_CHGCAR( 'cluster/DERIV' )
     rou_environ = read_CHGCAR( 'environ/DERIV' )
     d_rou = rou_cluster + rou_environ - rou_ref
+    rou_ref2 = rou_ref
     # remove the normalization differences
 #    d_rou = d_rou - average(d_rou)
     if len(args) == 0 or args[0] == 0:
-        W = E_cluster + E_environ - dot( extpot, rou_ref )/ntot
+        W = E_cluster + E_environ - numpy.dot( extpot, rou_ref2 )/ntot
     elif args[0] == 1:
         W = E_cluster
     elif args[0] == 2:
         W = E_environ
     else:
-        W = - dot( extpot, rou_ref )/ntot
+        W = - numpy.dot( extpot, rou_ref2 )/ntot
     # the library lbfgs algorithm is minimizing the function, while we need to maximize W, so add negative sign
     W = -W 
     if len(args) == 0 or args[0] == 0:
@@ -209,26 +212,30 @@ def Lagrangian( params, *args ):
     elif args[0] == 2:
         grad = -rou_environ/ntot
     else:
-        grad = rou_ref/ntot
+        grad = rou_ref2/ntot
     eval_counter += 1
-    print '--------------------'
-    print ' Evaluation No: %d'%eval_counter
-    print ' Norm of gradient without penalty: %12.6e'%sqrt(dot(grad,grad))
-    print ' Lagrangian value without penalty: %12.6e'%W
+    # without penalty
+    W_o = W
+    normgrad_o= sqrt(numpy.dot(grad,grad))
+    rms_o=normgrad_o*(sqrt(ntot))/vtot
     # add Laplacian penalty function
-    field = reshape(array(extpot),(NGXF,NGYF,NGZF),order='F')
+    field = reshape(numpy.array(extpot),(NGXF,NGYF,NGZF),order='F')
     laplacian = laplacian3d(field,NGXF,NGYF,NGZF)
     W -= sum(field * laplacian) * lambd
     grad -= reshape(laplacian,(NGXF*NGYF*NGZF), order='F') * lambd*2.0
     # +1 in execution counter
-    print ' Norm of gradient: %12.6e'%sqrt(dot(grad,grad))
-    print ' Lagrangian value: %12.6e'%W
+    normgrad=sqrt(numpy.dot(grad,grad))
+    rms=normgrad*(sqrt(ntot))/vtot
+    print('%4d' '%19.10e' '%19.10e' '%19.10e' '%19.10e' '%19.10e' '%19.10e' '%8d' '%8d' %(eval_counter,W,normgrad,rms,W_o,normgrad_o,rms_o,method,loopn))
     sys.stdout.flush()
     print_grid(rou_cluster+rou_environ, 'DERIV.current')
-    return W, grad
+    if method==1:
+       return W, grad
+    if method==2:
+       return W
 
 def read_pot( ifn ):
-    ifile = file( ifn, 'r' )
+    ifile = open( ifn, 'r' )
     iread = 0
     extpot = []
     for line in ifile:
@@ -243,36 +250,47 @@ def read_pot( ifn ):
             for word in words:
                 extpot.append(float(word))
     ifile.close()
-    return array(extpot)
+    return numpy.array(extpot)
 
-# Initial guess, allocating potential array
+
 if istart == 0:
-    extpot0 = array( [0.0 for i in range(ntot)] )
+    extpot0 = numpy.array( [0.0 for i in range(ntot)] )
 else:
     extpot0 = read_pot('EXTPOT')
-#direct = read_pot('direct')
 
-# identify direction
-#W0, direct = Lagrangian( extpot0, (0) )
-#direct = array([0.0 for i in range(ntot)])
-#direct[405050] = 1.0
-#
-#W0, grad0 = Lagrangian( extpot0, (0) )
-#
-#delta = 1e0 # 1e4
-#ofile = file( 'logfile', 'w' )
-#print >> ofile, '# %15.8e'%dot(grad0, direct)
-#for i in range(-2,3):
-#    extpot = extpot0 + delta*i*direct
-#    W, grad = Lagrangian( extpot, (0) )
-#    print >> ofile, '%15.6e%20.8e'%(i*delta,W)
-#ofile.close()
-
+loopn = 0
+method = 1
 W0, direct = Lagrangian( extpot0 )
 os.system('mv DERIV.current DERIV.init')
-x,f,d = optimize.fmin_l_bfgs_b( Lagrangian, x0=extpot0, args=(), pgtol=1e-06 )
+
+rou_cluster = read_CHGCAR( 'cluster/DERIV' )
+rou_environ = read_CHGCAR( 'environ/DERIV' )
+d_rou = rou_cluster + rou_environ - rou_ref
+file_name = 'drho.init'
+print_grid(d_rou, file_name)
+
+f_old = 0
+while True:
+    method = 1
+    loopn += 1
+    extpot0 = read_pot('EXTPOT')
+    x,f,d = optimize.fmin_l_bfgs_b( Lagrangian, x0=extpot0, args=(), pgtol=1e-05)
+    dW = abs(f-f_old)
+    if dW <= 1e-5:
+       print('------------------------------------------')
+       print('converged abs(dW): %19.10e'%dW)
+       print('after %6d LBFGS loop'%loopn)
+       print('------------------------------------------')
+       rou_cluster = read_CHGCAR( 'cluster/DERIV' )
+       rou_environ = read_CHGCAR( 'environ/DERIV' )
+       d_rou = rou_cluster + rou_environ - rou_ref
+       file_name = 'drho.' + str(loopn)
+       print_grid(d_rou, file_name)
+       break
+    f_old = f
+    print_grid(x,'EXTPOT')
 
 print_grid(x,'EXTPOT.final')
-print d['warnflag']
+print(d['warnflag'])
 if d['warnflag'] == 2:
-    print d['task']
+    print(d['task'])

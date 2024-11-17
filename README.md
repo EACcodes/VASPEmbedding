@@ -2,12 +2,21 @@
 # To install
 #############
 
-This module requires hookups inside the VASP program. These hookups have been added to
-the current VASP 6 development version and will be released with it. In the meantime,
-experienced licensed VASP users may obtain patch files detailing them from the authors.
+This module requires hookups inside the VASP 6 program.  
+Compilation Instructions: 
+For versions <6.3.1:
+1.	make vasp as you normally would
+2.	Delete the executable and all files related to extpot and extpot_glb in the build folder
+3.	Overwrite expot.F and extpot_glb.F in the src folder with the embedding ones
+4.	Rerun your make command. 
 
-Once the hookups are present, replace the dummy extpot.F file shipped with VASP with
-the one present in this github and (re)compile VASP (see VASP manual).
+For version 6.4.2:
+1.	Add the expot.F and expot_glb.F files from VASP version 6.3.1 to the src directory, overwriting the expot.F file
+2.	Overwrite the .objects file with the one attached.
+3.	Make 
+4.	Delete the executable and all files related to extpot and extpot_glb in the build folder
+5.	Overwrite expot.F and extpot_glb.F in the src folder with the embedding ones
+6.	Rerun your make command. 
 
 ###################
 # TO RUN - EXAMPLE
@@ -19,8 +28,8 @@ cp -r $VASPEMB_PATH/examples/cl2_test/* ./
 
 cp $VASPEMB_PATH/drivers/* ./
 
-open svasp.emb, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
-open optimize.py, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.5.3.3/vasp
+open svasp.emb, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.6.x.x/vasp
+open optimize.py, search for "VASP_EXEC", change its value to: $INSTALL_PATH/vasp.6.x.x/vasp
 
 do reference calculation
 cd ref
@@ -56,6 +65,7 @@ This section describes the important inputs in the VASP embedding run
 
 --- INCAR file ---
 LEXTPOT = .True. # This turns on the embedding calculation, must be set!
+DEXTPOT = .True. # This enables DERIV calc, must be set when doing OEP
 
 FCORR = 0.70     # This defines the region for derivative corrections. The exact derivatives are computed
                  # within the radius of FCORR*PSDMAX (PSDMAX determined by POTCAR)
@@ -79,6 +89,7 @@ na_cluster = {'Cl':1} # a dictionary defining the number of atoms by elements wi
 --- INCAR file ---
 ISYM = 0         # Turn off the symmetry, MUST BE SET in the Vemb optimization! Not necessary in reference calculation
 LEXTPOT = .True. # MUST SET!
+DEXTPOT = .True. # This enables DERIV calc, must be set when doing OEP
 FCORR = 0.70     # MUST be consistent with reference calculations
 NGXF/NGYF/NGZF   # MUST be consistent with reference calculations
 

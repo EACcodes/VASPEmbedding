@@ -7,7 +7,7 @@
   module mextpot
     use prec
     implicit none
-
+    
     type extpot
       logical :: lextpot, dextpot
       integer :: nx, ny, nz ! should be equal to the dimension of potential grid
@@ -22,23 +22,13 @@
     ! parameters for real space VLM projection
     integer, parameter :: KMAX=20, di_smear=5, NGRID=50
     real(q), parameter :: Delta = 0.1_q
-
+    
   contains
 
-    function EXTPT_LEXTPOT()
-      logical :: EXTPT_LEXTPOT
-      EXTPT_LEXTPOT=EXTPT%lextpot
-    end function EXTPT_LEXTPOT
-
-    function EXTPT_DEXTPOT()
-      logical :: EXTPT_DEXTPOT
-      EXTPT_DEXTPOT=EXTPT%dextpot
-    end function EXTPT_DEXTPOT
 
     ! read INCAR FILE for external potential information
     subroutine EXTPT_READER(NGXF,NGYF,NGZF,IU0,IU5,IU6)
       use base
-      use reader_tags
       use vaspxml
       implicit none
 
@@ -59,13 +49,41 @@
       EXTPT%nx = -1
       EXTPT%ny = -1
       EXTPT%nz = -1
-      CALL PROCESS_INCAR(INCAR_F, 'LEXTPOT', EXTPT%lextpot)
-      CALL PROCESS_INCAR(INCAR_F, 'DEXTPOT', EXTPT%dextpot)
-      if( EXTPT%lextpot ) then
-         CALL PROCESS_INCAR(INCAR_F, 'FCORR', EXTPT%FCORR)
-      endif
+      CALL RDATAB(lopen,INCAR,IU5,'LEXTPOT','=','#',';','L', &   ! calling rdatab subroutine for reading INCAR and searching for LEXTPOT 
+     &            IDUM,RDUM,CDUM,EXTPT%lextpot,CHARAC,N,1,IERR)
+      IF (((IERR/=0).AND.(IERR/=3)).OR. &
+     &                    ((IERR==0).AND.(N<1))) THEN
+         IF (IU0>=0) &
+         WRITE(IU0,*)'Error reading item ''LEXTPOT'' from file INCAR.'
+         EXTPT%lextpot = .FALSE.
+         RETURN
+      ENDIF
+       CALL RDATAB(lopen,INCAR,IU5,'DEXTPOT','=','#',';','L', &   ! calling rdatab subroutine for reading INCAR and searching for DEXTPOT 
+     &            IDUM,RDUM,CDUM,EXTPT%dextpot,CHARAC,N,1,IERR)
+      IF (((IERR/=0).AND.(IERR/=3)).OR. &
+     &                    ((IERR==0).AND.(N<1))) THEN
+         IF (IU0>=0) &
+         WRITE(IU0,*)'Error reading item ''DEXTPOT'' from file INCAR.'
+         EXTPT%dextpot = .FALSE.
+         RETURN
+      ENDIF
+     CALL XML_INCAR('LEXTPOT','L',IDUM,RDUM,CDUM,EXTPT%lextpot,CHARAC,N)
+     CALL XML_INCAR('DEXTPOT','L',IDUM,RDUM,CDUM,EXTPT%dextpot,CHARAC,N)
 
       if( EXTPT%lextpot ) then
+         CALL RDATAB(lopen,INCAR,IU5,'FCORR','=','#',';','F', &
+                     IDUM,EXTPT%FCORR,CDUM,LDUM,CHARAC,N,1,IERR)
+         IF (((IERR/=0).AND.(IERR/=3)).OR. &
+        &                    ((IERR==0).AND.(N<1))) THEN
+            IF (IU0>=0) &
+            WRITE(IU0,*)'Error reading item ''FCORR'' from file INCAR.'
+            EXTPT%FCORR = 0.67_q
+            RETURN
+         ENDIF
+         CALL XML_INCAR('FCORR','F',IDUM,EXTPT%FCORR,CDUM,LDUM,CHARAC,N)
+      endif
+
+      if( EXTPT%lextpot ) then 
          open(unit=IU_POT,file='EXTPOT',status='old')
          read(IU_POT,*) EXTPT%nx, EXTPT%ny, EXTPT%nz
          ! check grid size consistency
@@ -78,7 +96,7 @@
             write(IU0,*) '    NX,   NY,   NZ:', EXTPT%nx, EXTPT%ny, EXTPT%nx
             stop
          endif
-         allocate(EXTPT_GRID(EXTPT%nx, EXTPT%ny, EXTPT%nz))
+         allocate(EXTPT_GRID(EXTPT%nx, EXTPT%ny, EXTPT%nz)) 
          ! follow the tradition of CHGCAR format, ix be the fastest index
          read(IU_POT,*) (((EXTPT_GRID(ix,iy,iz), ix=1,EXTPT%nx), &
                                             iy=1,EXTPT%ny), iz=1,EXTPT%nz)
@@ -88,12 +106,22 @@
       return
     end subroutine EXTPT_READER
 
+   function EXTPT_LEXTPOT()
+      logical :: EXTPT_LEXTPOT
+      EXTPT_LEXTPOT=EXTPT%lextpot
+   end function EXTPT_LEXTPOT
+
+   function EXTPT_DEXTPOT()
+      logical :: EXTPT_DEXTPOT
+      EXTPT_DEXTPOT=EXTPT%dextpot
+   end function EXTPT_DEXTPOT
+   
 !******************** SUBROUTINE EXTERNAL_POT_ADD **********************
 ! A wrapper deal with the wierd variable type compatibility issue...
 ! In realmode, CVTOT allocated as complex array, but used as real grid
 !***********************************************************************
 
-    SUBROUTINE EXTPT_EXTERNAL_POT_ADD(GRIDC, LATT_CUR, CVTOT)
+    SUBROUTINE EXTERNAL_POT_ADD(GRIDC, LATT_CUR, CVTOT)
 
       USE prec
       USE base
@@ -112,44 +140,15 @@
 
       call EXTERNAL_POT_ADD_(GRIDC, LATT_CUR, CVTOT(1))
 
-    end subroutine EXTPT_EXTERNAL_POT_ADD
-
-    subroutine EXTPT_EXTERNAL_POT_ADD_PAW(POTAE, POT, NDIM, NCDIJ, LMMAX, NIP)
-
-      USE prec
-      USE base
-      USE lattice
-      USE mpimy
-      USE mgrid
-      USE poscar
-      USE constant
-      implicit none
-
-      INTEGER             NDIM, NCDIJ, LMMAX, NIP
-      REAL(q) POT(:,:,:), POTAE(:,:,:)
-
-      integer ISP, LM, II
-
-      do ISP = 1, NCDIJ
-         do LM = 1, LMMAX
-            do II = 1, NDIM
-               POTAE(II,LM,ISP) = POTAE(II,LM,ISP) + VLM(II,LM,NIP) !+1.0_q
-               POT(II,LM,ISP) = POT(II,LM,ISP) + VLM(II,LM,NIP) !+1.0_q
-            enddo
-         enddo
-      enddo
-
-    end subroutine EXTPT_EXTERNAL_POT_ADD_PAW
-
-
+    end subroutine EXTERNAL_POT_ADD
 
 !*********************** SUBROUTINE CALC_VLM ***************************
-! This subroutine calculates the LM component of the external potential
+! This subroutine calculates the LM component of the external potential 
 ! This code was written assuming realmode and NGZhalf = .True.
 !***********************************************************************
 
-    SUBROUTINE EXTPT_CALC_VLM(LATT_CUR, GRIDC, T_INFO, P, LMDIM, WDES, IU0)
-
+    SUBROUTINE CALC_VLM(LATT_CUR, GRIDC, T_INFO, P, LMDIM, WDES, IU0) 
+    
       use prec
       use base
       use lattice
@@ -193,7 +192,7 @@
 
       ! copy the external potential to CVEXT, change normal layout to VASP layout
       CVEXT = 0.0_q
-      call EXTERNAL_POT_ADD_(GRIDC, LATT_CUR, CVEXT(1))
+      call EXTERNAL_POT_ADD_(GRIDC, LATT_CUR, CVEXT(1)) 
 
       ! set up the maximum radial grid dimension, copied from SET_DD_PAW
       NDIM=0
@@ -235,7 +234,7 @@
                           , IRDMAX, INDMAX, .True.)
 
       ! start projection
-      VLMFULL = 0.0_q
+      VLMFULL = 0.0_q 
       ! do ion loops
       ion1: do NI=1,T_INFO%NIONS
          RI(:) = T_INFO%POSION(1:3,NI) ! ion position in direct coordinate
@@ -300,7 +299,7 @@
                LM=L*L+M+1
                VLM(:,LM,NIP) = VLMFULL(:,LM,NI)
             enddo
-         enddo
+         enddo 
       enddo ion2
       CALLMPI( M_sum_d(WDES%COMM_INTER, VLM, NDIM*LMMAX*WDES%NIONS) )
 
@@ -328,14 +327,14 @@
       deallocate(VLMFULL, CVEXT)
 
       return
-    END SUBROUTINE EXTPT_CALC_VLM
+    END SUBROUTINE CALC_VLM
 
 !*************************** subroutine SETYLM_FINE_GRID **************************
 ! this subroutine setup the fine grid for the real space projection integeration
 ! I made up this layout to parallel the real space projection code
 ! Use LPAR to choose whether to distritute the local fine grid points or not
 ! Note:
-! In CALC_VLM, we can not parallelize over uniform grid (GRIDC), so set LPAR = .Ture.
+! In CALC_VLM, we can not parallelize over uniform grid (GRIDC), so set LPAR = .Ture. 
 ! to parallelize over the local fine grid
 ! In DE_DVRN, parallelize over GRIDC, so set LPAR = .False., making the local
 ! fine grid layout serial.
@@ -356,7 +355,7 @@
       real(q) :: YLM(IRDMAX,LMMAX), DIST(IRDMAX)
       integer :: ix, iy, iz, NODE_ME, NCPU, IND
       logical :: LPAR
-
+      
 #ifdef MPI
       NCPU = GRIDC%COMM%NCPU
       NODE_ME = GRIDC%COMM%NODE_ME
@@ -487,7 +486,7 @@
 ! Calculate the 1-D B-spline coefficients for a "delta" grid
 !***********************************************************************
     subroutine CALC_Sdelta_COEFF(N, s, di_smear)
-    use prec
+    use prec 
     use constant
     implicit none
       integer :: N, di_smear
@@ -594,7 +593,7 @@
 !************************ FUNCTION FSWITCH *****************************
 !
 ! This function calculates the switch function f(r) for V(r)
-! In principle, can be anything as long as:
+! In principle, can be anything as long as: 
 ! f(RMAX) = 1
 ! f'(RMAX) = 0
 ! f(RMAX+Delta) = 0
@@ -617,6 +616,34 @@
       return
     end function FSWITCH
 
+subroutine ADD_EXTERNAL_POTENTIAL(POTAE, POT, NDIM, NCDIJ, LMMAX, NIP)
+
+      USE prec
+      USE base
+      USE lattice
+      USE mpimy
+      USE mgrid
+      USE poscar
+      USE constant
+      implicit none
+
+      INTEGER             NDIM, NCDIJ, LMMAX, NIP
+      REAL(q) POT(NDIM,LMMAX,NCDIJ), POTAE(NDIM,LMMAX,NCDIJ)
+
+      integer ISP, LM, II
+
+      do ISP = 1, NCDIJ
+         do LM = 1, LMMAX
+            do II = 1, NDIM
+               POTAE(II,LM,ISP) = POTAE(II,LM,ISP) + VLM(II,LM,NIP) !+1.0_q
+               POT(II,LM,ISP) = POT(II,LM,ISP) + VLM(II,LM,NIP) !+1.0_q
+            enddo
+         enddo
+      enddo
+
+   end subroutine ADD_EXTERNAL_POTENTIAL
+
+
 !************************* ENERGY_DERIVATIVE ***************************
 ! This subroutine augments the electron density to give dE/dV(r)
 ! Theoretically it should be the AE density
@@ -627,7 +654,7 @@
 !        defined in GRID_SOFT
 ! CHTOT: tilde(n) + hat(n) as input, correct dE/dV as output
 !***********************************************************************
-    SUBROUTINE EXTPT_DE_DVRN(WDES, GRID_SOFT, GRIDC, SOFT_TO_C, LATT_CUR, &
+    SUBROUTINE DE_DVRN(WDES, GRID_SOFT, GRIDC, SOFT_TO_C, LATT_CUR, &
         P, T_INFO, LMDIM, CRHODE, CHTOT_, CHDEN, IRDMAX )
       use prec
       use base
@@ -653,6 +680,7 @@
       COMPLEX(q) CHDEN(GRID_SOFT%MPLWV,WDES%NCDIJ)
       OVERLAP   CRHODE(LMDIM,LMDIM,WDES%NIONS,WDES%NCDIJ)
       COMPLEX(q),TARGET  :: CHTOT_(DIMREAL(GRIDC%MPLWV),WDES%NCDIJ)
+      !RGRID,TARGET :: CHTOT_(DIMREAL(GRIDC%MPLWV),WDES%NCDIJ)
       ! local variable
       integer, external :: MAXL_AUG, MAXL1
       integer :: ISP, NT, NI, NIP, LYMAX, LMMAX, INDMAX, IND, NDIM, I
@@ -662,7 +690,9 @@
       integer :: NXMAX, NYMAX, NZMAX, NALLOC, NGF, JLL, JLM, ierror
       integer, allocatable :: NLI(:), LLOCAL(:)
       real(q), allocatable :: CWORK(:)
+      complex(q), allocatable :: CWORK2(:)
       COMPLEX(q),POINTER :: CHTOT(:)
+      !RGRID,POINTER :: CHTOT(:)
       integer, parameter :: nprint=8
       integer :: ofile
       integer :: INDFMAX, INDF, K, ix, iy, iz, ixp, iyp, izp, dix, diy, diz
@@ -677,9 +707,9 @@
       character(50) :: buffer
       logical :: LINFO
 
-      ! temparary storage matrix for rho_ij
+      ! 
       ALLOCATE(CTMP(LMDIM,LMDIM,T_INFO%NIONS,WDES%NCDIJ))
-      allocate(CWORK(DIMREAL(GRIDC%MPLWV)))
+      allocate(CWORK(DIMREAL(GRIDC%MPLWV)), CWORK2((DIMREAL(GRIDC%MPLWV))))
 
       LYMAX=MAXL_AUG(T_INFO%NTYP,P)
       LMMAX=(LYMAX+1)**2          ! number of lm pairs
@@ -750,6 +780,9 @@
       ! Do the actual work, only work with the total (alpha+beta) component
       spin: do ISP = 1, 1 !WDES%NCDIJ
       CHTOT => CHTOT_(:,ISP)
+      !do i = 1, size(CHTOT)
+      !   write(*, "(E15.7, E15.7)") real(CHTOT(i)), aimag(CHTOT(i))
+      !enddo
       ion: do NI = 1, T_INFO%NIONS
          if ( ICPU == 1 ) write(*,*) 'Ion:', NI
          CWORK = 0.0_q
@@ -801,7 +834,7 @@
             l_loop:  DO L =1,P(NT)%LMAX
             LMP=LM
             lp_loop: DO LP=L,P(NT)%LMAX
-
+            
             if ( .not. LINFO ) then
               ! setup QIJ
               call SETQIJ(GRIDC, L,LP,P(NT),QIJ, NDIM)
@@ -848,7 +881,7 @@
                !*****************************
                ! compute and write DERINFO
                !*****************************
-               DO  IC=ISTART,IEND-1
+               DO  IC=ISTART,IEND-1 
                   JLL = JL(IC)
                   JLM = JS(IC)
 
@@ -859,14 +892,14 @@
                     do INDF = 1, INDFMAX
                       R = DISTF(INDF)*RCUT ! in Angstrom
                       if ( R <= RCUT ) then
-                        RVECF(1) = XSF(INDF)*R
-                        RVECF(2) = YSF(INDF)*R
+                        RVECF(1) = XSF(INDF)*R 
+                        RVECF(2) = YSF(INDF)*R 
                         RVECF(3) = ZSF(INDF)*R
                         RVECF = matmul( transpose(LATT_CUR%B(1:3,1:3)), RVECF(1:3) )
                         DRVEC = RVECF - RVEC ! in direct
                         if(abs(DRVEC(1)*NXMAX)<di_smear+1 .and. &
                            abs(DRVEC(2)*NYMAX)<di_smear+1 .and. &
-                           abs(DRVEC(3)*NZMAX)<di_smear+1) then
+                           abs(DRVEC(3)*NZMAX)<di_smear+1) then 
                           RVECF(:) = RVECF(:) + RI(:) ! grid coordinate in direct
                           val = bspline( RVECF, SGRID, NXMAX, NYMAX, NZMAX )
                           VLMK(K) = VLMK(K) + dV* FSWITCH(R,RMAX,Delta)* &
@@ -897,7 +930,7 @@
                   STMP3 = STMP3 + STMP2*YLM3(IC)
                ENDDO
                ! write the external info
-               write(ofile,'(I4,I8,4I4,E25.10)') NI,abs(LLOCAL(IND)),L,M,LP,MP,STMP3
+               write(ofile,'(I4,I12,4I4,E25.10)') NI,abs(LLOCAL(IND)),L,M,LP,MP,STMP3
                endif
                ! \sum_llpmmp rho_ij
                SUM(IND) = SUM(IND) + STMP3*CTMP(LM+M-1,LMP+MP-1,NI,ISP)*FAKLLP
@@ -921,9 +954,10 @@
               CWORK(NLI(IND)) = CWORK(NLI(IND)) + SUM(IND)*NXMAX*NYMAX*NZMAX
             endif
          enddo
+
          ! FFT to reciprocal space
-         CALL FFT_RC_SCALE(CWORK(1),CWORK(1),GRIDC)
-         CHTOT = CWORK + CHTOT
+         CALL FFT_RC_SCALE(CWORK(1),CWORK2(1),GRIDC)
+         CHTOT = CWORK2 + CHTOT
       enddo ion
       enddo spin
 
@@ -931,7 +965,7 @@
       close( ofile )
 
       return
-    END SUBROUTINE EXTPT_DE_DVRN
+    END SUBROUTINE DE_DVRN
 
 end module mextpot
 
