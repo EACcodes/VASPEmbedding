@@ -6,7 +6,7 @@ This module requires hookups inside the VASP 6 program.
 Compilation Instructions: 
 For versions <=6.3.1:
 1.	Overwrite extpot.F with the embedding one and remove extpot_glb.F in the src folder
-2.	Delete expot_glb.F from the .objects file
+2.	Delete extpot_glb.F from the .objects file
 3.	Make VASP as per usual
 
 For version >=6.4.2:
