@@ -4,19 +4,15 @@
 
 This module requires hookups inside the VASP 6 program.  
 Compilation Instructions: 
-For versions <6.3.1:
-1.	make vasp as you normally would
-2.	Delete the executable and all files related to extpot and extpot_glb in the build folder
-3.	Overwrite expot.F and extpot_glb.F in the src folder with the embedding ones
-4.	Rerun your make command. 
+For versions <=6.3.1:
+1.	Overwrite expot.F with the embedding one and remove extpot_glb.F in the src folder
+2.	Delete expot_glb.F from the .objects file
+3.	Make VASP as per usual
 
-For version 6.4.2:
-1.	Add the expot.F and expot_glb.F files from VASP version 6.3.1 to the src directory, overwriting the expot.F file
-2.	Overwrite the .objects file with the one attached.
-3.	Make 
-4.	Delete the executable and all files related to extpot and extpot_glb in the build folder
-5.	Overwrite expot.F and extpot_glb.F in the src folder with the embedding ones
-6.	Rerun your make command. 
+For version >=6.4.2:
+1.	Overwrite expot.F with the embedding one in the src folder
+2.	Make VASP as per usual
+
 
 ###################
 # TO RUN - EXAMPLE

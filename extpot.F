@@ -662,6 +662,7 @@
       integer :: NXMAX, NYMAX, NZMAX, NALLOC, NGF, JLL, JLM, ierror
       integer, allocatable :: NLI(:), LLOCAL(:)
       real(q), allocatable :: CWORK(:)
+      complex(q), allocatable :: CWORK2(:)
       COMPLEX(q),POINTER :: CHTOT(:)
       integer, parameter :: nprint=8
       integer :: ofile
@@ -679,7 +680,7 @@
 
       ! temparary storage matrix for rho_ij
       ALLOCATE(CTMP(LMDIM,LMDIM,T_INFO%NIONS,WDES%NCDIJ))
-      allocate(CWORK(DIMREAL(GRIDC%MPLWV)))
+      allocate(CWORK(DIMREAL(GRIDC%MPLWV)),  CWORK2((DIMREAL(GRIDC%MPLWV))))
 
       LYMAX=MAXL_AUG(T_INFO%NTYP,P)
       LMMAX=(LYMAX+1)**2          ! number of lm pairs
@@ -837,7 +838,7 @@
                !*****************************
                ! read STMP3 from DERINFO
                !*****************************
-               read(ofile,'(I4,I8,4I4,E25.10)') NIP,IGRID,LT,MT,LPT,MPT,STMP3
+               read(ofile,'(I4,I12,4I4,E25.10)') NIP,IGRID,LT,MT,LPT,MPT,STMP3
                ! check consistency
                if (NIP/=NI .or. IGRID/=ABS(LLOCAL(IND)) .or. LT/=L .or. MT/=M &
                   .or. LPT/=LP .or. MPT/=MP ) then
@@ -897,7 +898,7 @@
                   STMP3 = STMP3 + STMP2*YLM3(IC)
                ENDDO
                ! write the external info
-               write(ofile,'(I4,I8,4I4,E25.10)') NI,abs(LLOCAL(IND)),L,M,LP,MP,STMP3
+               write(ofile,'(I4,I12,4I4,E25.10)') NI,abs(LLOCAL(IND)),L,M,LP,MP,STMP3
                endif
                ! \sum_llpmmp rho_ij
                SUM(IND) = SUM(IND) + STMP3*CTMP(LM+M-1,LMP+MP-1,NI,ISP)*FAKLLP
@@ -922,8 +923,8 @@
             endif
          enddo
          ! FFT to reciprocal space
-         CALL FFT_RC_SCALE(CWORK(1),CWORK(1),GRIDC)
-         CHTOT = CWORK + CHTOT
+         CALL FFT_RC_SCALE(CWORK(1),CWORK2(1),GRIDC)
+         CHTOT = CWORK2 + CHTOT
       enddo ion
       enddo spin
 
