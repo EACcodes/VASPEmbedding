@@ -68,10 +68,13 @@ FCORR = 0.70     # This defines the region for derivative corrections. The exact
                  # Usually, 0.70 is fine, default is 0.67, unless see difficulties in optimization, there 
                  # is no need to use larger values.
 
-NGXF = 100       # Defines the dimension of the grid usded to express density and potential.
-NGYF = 100       # Note that for efficiecy consideration, VASP may change them to different values, always
-NGZF = 100       # check the OUTCAR for the true dimensions that are used by VASP.
-       
+# Defines the dimension of the grid usded to express density and potential.       
+# Note that for efficiecy consideration, VASP may change them to different values, always
+# check the OUTCAR for the true dimensions that are used by VASP.
+NGXF = 100      
+NGYF = 100       
+NGZF = 100      
+
 
 ***** In the Vemb optimization, watch out the following parameters:
 
