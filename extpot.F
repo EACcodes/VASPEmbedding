@@ -652,7 +652,7 @@
       integer :: LMDIM, IRDMAX
       COMPLEX(q) CHDEN(GRID_SOFT%MPLWV,WDES%NCDIJ)
       OVERLAP   CRHODE(LMDIM,LMDIM,WDES%NIONS,WDES%NCDIJ)
-      COMPLEX(q),TARGET  :: CHTOT_(DIM(GRIDC%MPLWV),WDES%NCDIJ)
+      COMPLEX(q),TARGET  :: CHTOT_(GRIDC%MPLWV,WDES%NCDIJ)
       ! local variable
       integer, external :: MAXL_AUG, MAXL1
       integer :: ISP, NT, NI, NIP, LYMAX, LMMAX, INDMAX, IND, NDIM, I
@@ -680,7 +680,7 @@
 
       ! temparary storage matrix for rho_ij
       ALLOCATE(CTMP(LMDIM,LMDIM,T_INFO%NIONS,WDES%NCDIJ))
-      allocate(CWORK(DIMREAL(GRIDC%MPLWV)),  CWORK2((DIMREAL(GRIDC%MPLWV))))
+      allocate(CWORK(DIMREAL(GRIDC%MPLWV)),  CWORK2(GRIDC%MPLWV))
 
       LYMAX=MAXL_AUG(T_INFO%NTYP,P)
       LMMAX=(LYMAX+1)**2          ! number of lm pairs
